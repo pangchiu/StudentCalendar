@@ -7,10 +7,10 @@ class APIICTU {
 
   APIICTU._();
 
-  String urlLogin = "http://220.231.119.171/kcntt/login.aspx";
-  String urlOrigin = "http://220.231.119.171";
+  String urlLogin = "http://dangkytinchi.ictu.edu.vn/kcntt/login.aspx";
+  final String urlOrigin = "http://dangkytinchi.ictu.edu.vn";
   String urlSchedule =
-      "http://220.231.119.171/kcntt/Reports/Form/StudentTimeTable.aspx";
+      "http://dangkytinchi.ictu.edu.vn/kcntt/Reports/Form/StudentTimeTable.aspx";
   String? cookie;
 
   Options get optionsGetCokies => Options(
@@ -26,7 +26,7 @@ class APIICTU {
             'User-Agent':
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67',
             'Content-Type': 'application/x-www-form-urlencoded',
-            'Origin': 'http://220.231.119.171',
+            'Origin': urlOrigin,
             'Upgrade-Insecure-Requests': '1',
             'Cache-Control': 'max-age=0',
             'Connection': 'keep-alive',
@@ -36,7 +36,7 @@ class APIICTU {
 
   Options get optionsLogin => Options(followRedirects: true, headers: {
         'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8',
-        'Referer': 'http://dangkytinchi.ictu.edu.vn/',
+        'Referer': urlOrigin,
         'Accept':
             'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
         'User-Agent':
@@ -65,42 +65,121 @@ class APIICTU {
             'Connection': 'keep-alive',
             'Accept-Encoding': 'gzip, deflate',
             'Host': '220.231.119.171',
+            'Origin': urlOrigin,
+            'Content-Type': 'application/x-www-form-urlencoded',
           });
 
   Future<List<dynamic>> getSchedule(String useName, String passWord) async {
     // lấy form data để đăng nhập
-    return await getFormData().then((formData) async {
+    return await formData().then((formData) async {
       // lấy cookies
       cookie = await getCookie(useName, passWord, formData);
       if (cookie != null) {
-        return await Dio()
-            .get(urlSchedule, options: optionsGetSchedule)
-            .then((res) {
-          return json(res);
-        });
-      } else
+        var response =
+            await Dio().get(urlSchedule, options: optionsGetSchedule);
+        if (response.statusCode == 200) {
+          urlSchedule = urlOrigin + response.realUri.toString();
+          var form = formDataSchedule(response);
+          String defaultDrpSemester = form['defaultDrpSemester'];
+          form.remove('defaultDrpSemester');
+
+          var res = await Dio()
+              .post(urlSchedule, options: optionsGetSchedule, data: form);
+
+          var form2 = formDataSchedule(res,
+              fist: false, fistDrpSemester: defaultDrpSemester);
+
+          var res2 = await Dio()
+              .post(urlSchedule, options: optionsGetSchedule, data: form2);
+          return json(res2);
+        } else {
+          return [];
+        }
+      } else {
         return [];
+      }
     });
   }
 
-  Future<Map> getFormData() async {
+  Future<Map> formData() async {
     return await Dio().get(urlLogin, options: optionsLogin).then((response) {
-      // gán đường dẫn đăng nhập mới vì khi đăng nhập từ đường dẫn đăng nhập gốc sẽ bị điều hướng
-      urlLogin = urlOrigin + response.realUri.toString();
-
-      // trả về form để đăng nhập
       var form = {};
-      var document = parse(response.data);
-      form['__VIEWSTATE'] = document
-          .getElementById('__VIEWSTATE')!
-          .attributes['value']
-          .toString();
-      form['__EVENTVALIDATION'] = document
-          .getElementById('__EVENTVALIDATION')!
-          .attributes['value']
-          .toString();
+      // gán đường dẫn đăng nhập mới vì khi đăng nhập từ đường dẫn đăng nhập gốc sẽ bị điều hướng
+      if (response.statusCode == 200) {
+        urlLogin = urlOrigin + response.realUri.toString();
+
+        // trả về form để đăng nhập
+
+        var document = parse(response.data);
+        form['__VIEWSTATE'] = document
+            .getElementById('__VIEWSTATE')!
+            .attributes['value']
+            .toString();
+        form['__EVENTVALIDATION'] = document
+            .getElementById('__EVENTVALIDATION')!
+            .attributes['value']
+            .toString();
+      }
       return form;
     });
+  }
+
+  Map<String, dynamic> formDataSchedule(Response current,
+      {bool fist = true, String? fistDrpSemester}) {
+    Map<String, dynamic> form = {};
+
+    var document = parse(current.data);
+
+    form['__VIEWSTATE'] =
+        document.getElementById('__VIEWSTATE')!.attributes['value'].toString();
+
+    form['__EVENTVALIDATION'] = document
+        .getElementById('__EVENTVALIDATION')!
+        .attributes['value']
+        .toString();
+
+    /*  khi request lần đầu sẽ có khả năng không có lịch nên sẽ phải
+     request lần 2 để có dữ liệu khi request lần 1 sẽ mất đi drpSemester mặc định
+     ban đầu nên cần tạo thêm biến để lưu drpSemester mặc định */
+
+    if (fist == true) {
+      // drpSemester
+      form['drpSemester'] = document
+          .getElementById('drpSemester')!
+          .querySelectorAll('option')[0]
+          .attributes['value'];
+
+      var opts =
+          document.getElementById('drpSemester')!.querySelectorAll('option');
+      int index =
+          opts.indexWhere((e) => e.attributes['selected'] == 'selected');
+      form['defaultDrpSemester'] = opts[index].attributes['value'];
+    } else {
+      form['drpSemester'] = fistDrpSemester!;
+    }
+    //hidShowTeacher
+    form['hidShowTeacher'] =
+        document.getElementById('hidShowTeacher')!.attributes['value'];
+
+    // drpType
+    form['drpType'] = document
+        .getElementById('drpType')!
+        .querySelectorAll('option')[0]
+        .attributes['value'];
+
+    //hidTuitionFactorMode
+    form['hidTuitionFactorMode'] =
+        document.getElementById('hidTuitionFactorMode')!.attributes['value'];
+
+    //hidLoaiUuTienHeSoHocPhi
+    form['hidLoaiUuTienHeSoHocPhi'] =
+        document.getElementById('hidLoaiUuTienHeSoHocPhi')!.attributes['value'];
+
+    //hidStudentId
+    form['hidStudentId'] =
+        document.getElementById('hidStudentId')!.attributes['value'];
+
+    return form;
   }
 
   Future<String?> getCookie(String useName, String passWord, Map form) {
@@ -111,7 +190,11 @@ class APIICTU {
     return Dio()
         .post(urlLogin, options: optionsGetCokies, data: form)
         .then((response) {
-      return fomatCookies(response);
+      if (response.statusCode == 200 || response.statusCode == 302) {
+        return fomatCookies(response);
+      } else {
+        return null;
+      }
     });
   }
 
@@ -139,13 +222,13 @@ class APIICTU {
       // phần tử thứ 2 là mã học phần
       // phần tử thứ 3 là thời khóa biểu
       // phần tử thứ 4,5,6 là địa điểm, giáo viên , sĩ số,số tín chỉ
-      String subject = datas[1].getElementsByTagName("b")[0].innerHtml.trim();
+      String subject = datas[1].innerHtml.trim();
       String code = datas[2].getElementsByTagName("span")[0].innerHtml.trim();
       var location = getLocation(datas[4].innerHtml.trim());
       String teacher = datas[5].innerHtml.trim();
       var scheduleOfSubject = getScheduleOfSubject(
           datas[3].innerHtml, subject, location, teacher, code);
-      schedule = mergeSchedule(schedule, scheduleOfSubject);
+      mergeSchedule(schedule, scheduleOfSubject);
     });
     return schedule;
   }
@@ -185,7 +268,7 @@ class APIICTU {
       var scheduleForPeriod = getScheduleDetail(cycle, period);
 
       // gộp lịch học trong các khoảng thời gian
-      schedule = mergeSchedule(schedule, scheduleForPeriod);
+      mergeSchedule(schedule, scheduleForPeriod);
     });
 
     return schedule;
@@ -193,7 +276,7 @@ class APIICTU {
 
   List<Map<String, dynamic>> mergeSchedule(
       List<Map<String, dynamic>> root, List<Map<String, dynamic>> other) {
-    List<Map<String, dynamic>> newRoot = List.from(root);
+    List<Map<String, dynamic>> newRoot = root;
     if (newRoot.isEmpty) {
       newRoot.addAll(other);
     } else {
@@ -236,6 +319,7 @@ class APIICTU {
           .firstWhere((element) => (element as String).indexOf(number) != -1);
       location = locations[keyOfNumber];
     } else {
+       // quy định trong phần địa điểm nếu chỉ có 1 địa điểm thì map có key "only"
       location = locations["only"];
     }
     if (cycle.length > 1) {

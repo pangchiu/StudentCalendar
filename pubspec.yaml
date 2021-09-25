@@ -42,7 +42,9 @@ flutter:
   fonts:
     - family: Montserrat-Bold
       fonts:
-        - asset: fonts/Montserrat-Bold.ttfgit push origin master
+        - asset: fonts/Montserrat-Bold.ttf
+
+    - family: Montserrat-Medium
       fonts:
         - asset: fonts/Montserrat-Medium.ttf
         

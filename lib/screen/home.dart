@@ -4,7 +4,6 @@ import 'package:app/app_data_base.dart';
 import 'package:app/model/api_ictu.dart';
 import 'package:app/model/task.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lottie/lottie.dart';
 
@@ -28,11 +27,6 @@ class HomeScreenState extends State<HomeScreen> {
             builder: (context, snapshot) {
               if (snapshot.hasData) {
                 events = snapshot.data!;
-                SchedulerBinding.instance!.addPostFrameCallback((_) {
-                  setState(() {
-                    showBottomBar = true;
-                  });
-                });
                 return Column(
                   children: [
                     buildCalendar(),
@@ -42,10 +36,10 @@ class HomeScreenState extends State<HomeScreen> {
                 return Lottie.asset('images/cat_loader.json', repeat: true);
               }
             }),
-        bottomNavigationBar: Visibility(
-          child: buildBottomNavigationBar(),
-          visible: showBottomBar,
-        ),
+        // bottomNavigationBar: Visibility(
+        //   child: buildBottomNavigationBar(),
+        //   visible: showBottomBar,
+        // ),
       ),
     );
   }
@@ -143,6 +137,7 @@ class HomeScreenState extends State<HomeScreen> {
 
   Future<List<Task>> getAllEvent() async {
     var tasks = await AppDatabase.instance.allTask();
+
     if (tasks.isEmpty) {
       var schedule = await APIICTU.instance
           .getSchedule("DTC1854802010001", "c6dea4fca538c435f58b32dc7699c907");

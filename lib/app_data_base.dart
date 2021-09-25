@@ -51,64 +51,51 @@ class AppDatabase {
   void insetAll(List<dynamic> schedule) async {
     final db = await instance.database;
 
-    //   //thêm cái này để tránh lỗi locked do yêu cầu đợi quá nhiều
-    //   Batch batch = db.batch();
+    var batch = db.batch();
+    var batchId = db.batch();
 
-    //   schedule.forEach((e) async {
-    //     final dateOfTask = (e['date'] as DateTime).toIso8601String();
+    schedule.forEach((e) async {
+      final dateOfTask = (e['date'] as DateTime).toIso8601String();
 
-    //     final List<dynamic> sessions = (e['sessions'] as List);
+      final List<dynamic> sessions = (e['sessions'] as List);
 
-    //     // chèn phần tử bảng tasks
-    //     int idTask =
-    //         await db.rawInsert('INSERT INTO tasks(date) VALUES("$dateOfTask")');
+      batchId.rawInsert('INSERT INTO tasks(date) VALUES("$dateOfTask")');
+      var id = await batchId.commit(noResult: false);
 
-    //     sessions.forEach((s) {
-    //       var json = Session.fromJson(s).toJson();
-    //       json["idTask"] = idTask;
-    //       batch.insert('sessions', json,
-    //           conflictAlgorithm: ConflictAlgorithm.replace);
-    //     });
-    //   });
-
-    //  batch.commit();
-    await db.transaction((txn) async {
-      var batch = txn.batch();
-      schedule.forEach((e) async {
-        final dateOfTask = (e['date'] as DateTime).toIso8601String();
-
-        final List<dynamic> sessions = (e['sessions'] as List);
-
-        // chèn phần tử bảng tasks
-        int idTask =
-            await db.rawInsert('INSERT INTO tasks(date) VALUES("$dateOfTask")');
-
-        sessions.forEach((s) {
-          var json = Session.fromJson(s).toJson();
-          json["idTask"] = idTask;
-          batch.insert('sessions', json,
-              conflictAlgorithm: ConflictAlgorithm.replace);
-        });
+      sessions.forEach((s) {
+        var json = Session.fromJson(s).toJson();
+        json["idTask"] = int.parse(id[0].toString());
+        batch.insert('sessions', json,
+            conflictAlgorithm: ConflictAlgorithm.replace);
       });
-
-      await batch.commit();
-
-      //  ...
     });
+
+    await batch.commit(noResult: true);
   }
 
   Future<List<Task>> allTask() async {
     final db = await instance.database;
-    final List<Map<String, dynamic>> mapsOfTask = await db.query('tasks');
+    var batchTasks = db.batch();
+    var batchSessions = db.batch();
+
+    batchTasks.query('tasks');
+    var m = await batchTasks.commit(noResult: false);
+    m.cast<Map<String,dynamic>?>();
     List<Task> tasks = [];
-    mapsOfTask.forEach((e) async {
-      final List<Map<String, Object?>> mapsOfSessions =
-          await db.query('sessions', where: 'idTask = ?', whereArgs: [e["id"]]);
-      List<Session> sessions = List.generate(mapsOfSessions.length, (index) {
-        return Session.fromJson(mapsOfSessions[index]);
-      });
-      tasks.add(Task(date: DateTime.parse(e["date"]), sessions: sessions));
-    });
+    // m.forEach((e) async {
+    //   print(e);
+    //   print(e.toString());
+    //   batchSessions.query('sessions',
+    //       where: 'idTask = ?', whereArgs: [int.parse(e!.toString())]);
+    //   var m1 = await batchSessions.commit(noResult: false);
+    //   var mapsOfSessions = m1.cast<Map<String, dynamic>>();
+    //   List<Session> sessions = List.generate(mapsOfSessions.length, (index) {
+    //     return Session.fromJson((mapsOfSessions as Map)[index]);
+    //   });
+    //   String a = "idTouch";
+    //   tasks.add(Task(date: DateTime.parse(a), sessions: sessions));
+    // });
+
     return tasks;
   }
 }
