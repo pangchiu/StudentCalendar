@@ -26,17 +26,17 @@ class AppDatabase {
   }
 
   Future _onCreate(Database db, int version) async {
-    // Tạo bảng tasks
+    // Tạo bảng DAYS
     await db.execute('''
-      CREATE TABLE tasks(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+      CREATE TABLE DAYS(
+        idDay INTEGER PRIMARY KEY AUTOINCREMENT,
         date TEXT)
     ''');
 
-    // tạo bảng sessions
+    // tạo bảng MISSIONS
     await db.execute('''
-      CREATE TABLE sessions(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+      CREATE TABLE MISSIONS(
+        idMissions INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         code TEXT,
         location TEXT,
@@ -44,57 +44,44 @@ class AppDatabase {
         time TEXT,
         type TEXT,
         node TEXT,
-        idTask INTEGER NOT NULL)
+        idDay INTEGER NOT NULL)
     ''');
   }
 
   void insetAll(List<dynamic> schedule) async {
     final db = await instance.database;
+    await db.transaction((txn) async {
+      schedule.forEach((s) async {
+        final date = (s['date'] as DateTime).toIso8601String();
+        int id = await txn.rawInsert('INSERT INTO DAYS(date) VALUES("$date")');
+        final List<dynamic> missions = (s['sessions'] as List);
 
-    var batch = db.batch();
-    var batchId = db.batch();
-
-    schedule.forEach((e) async {
-      final dateOfTask = (e['date'] as DateTime).toIso8601String();
-
-      final List<dynamic> sessions = (e['sessions'] as List);
-
-      batchId.rawInsert('INSERT INTO tasks(date) VALUES("$dateOfTask")');
-      var id = await batchId.commit(noResult: false);
-
-      sessions.forEach((s) {
-        var json = Session.fromJson(s).toJson();
-        json["idTask"] = int.parse(id[0].toString());
-        batch.insert('sessions', json,
-            conflictAlgorithm: ConflictAlgorithm.replace);
+        missions.forEach((m) async {
+          var map = Session.fromJson(m).toJson();
+          map["idDay"] = id;
+         await  txn.insert('MISSIONS', map,
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        });
       });
     });
-
-    await batch.commit(noResult: true);
   }
 
   Future<List<Task>> allTask() async {
     final db = await instance.database;
-    var batchTasks = db.batch();
-    var batchSessions = db.batch();
-
-    batchTasks.query('tasks');
-    var m = await batchTasks.commit(noResult: false);
-    m.cast<Map<String,dynamic>?>();
     List<Task> tasks = [];
-    // m.forEach((e) async {
-    //   print(e);
-    //   print(e.toString());
-    //   batchSessions.query('sessions',
-    //       where: 'idTask = ?', whereArgs: [int.parse(e!.toString())]);
-    //   var m1 = await batchSessions.commit(noResult: false);
-    //   var mapsOfSessions = m1.cast<Map<String, dynamic>>();
-    //   List<Session> sessions = List.generate(mapsOfSessions.length, (index) {
-    //     return Session.fromJson((mapsOfSessions as Map)[index]);
-    //   });
-    //   String a = "idTouch";
-    //   tasks.add(Task(date: DateTime.parse(a), sessions: sessions));
-    // });
+    await db.transaction((txn) async {
+      var days = await txn.query('DAYS');
+      days.forEach((e) async {
+        var jsonMissions = await txn
+            .query('MISSIONS', where: 'idDay = ?', whereArgs: [e["idDay"]]);
+
+        List<Session> sessions = List.generate(jsonMissions.length, (index) {
+          return Session.fromJson(jsonMissions[index]);
+        });
+        tasks.add(Task(
+            date: DateTime.parse(e["date"].toString()), sessions: sessions));
+      });
+    });
 
     return tasks;
   }

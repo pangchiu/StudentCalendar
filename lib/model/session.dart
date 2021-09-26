@@ -1,6 +1,6 @@
 class Session {
-  int? id;
-  int? idTask;
+  int? idMissions;
+  int? idDay;
   String name;
   String code;
   String location;
@@ -17,8 +17,8 @@ class Session {
     required this.time,
     required this.type,
     this.node,
-    this.id,
-    this.idTask,
+    this.idMissions,
+    this.idDay,
   });
 
   factory Session.fromJson(Map<String, dynamic> json) {
@@ -35,8 +35,8 @@ class Session {
 
   Map<String, Object?> toJson() {
     return {
-      "id": id,
-      "idTask": idTask,
+      "idMissions": idMissions,
+      "idDay": idDay,
       "name": name,
       "code": code,
       "location": location,
