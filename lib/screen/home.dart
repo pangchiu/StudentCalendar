@@ -18,6 +18,11 @@ class HomeScreenState extends State<HomeScreen> {
   List<Task> events = [];
 
   @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
@@ -25,21 +30,25 @@ class HomeScreenState extends State<HomeScreen> {
         body: FutureBuilder<List<Task>>(
             future: getAllEvent(),
             builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                events = snapshot.data!;
-                return Column(
-                  children: [
-                    buildCalendar(),
-                  ],
-                );
+              if (snapshot.connectionState == ConnectionState.done) {
+                if (snapshot.hasError) {
+                  return Lottie.asset('images/cat_loader.json', repeat: true);
+                } else {
+                  events = snapshot.data!;
+                  setState(() {
+                    showBottomBar = true;
+                  });
+                  return Column(
+                    children: [
+                      buildCalendar(),
+                    ],
+                  );
+                }
               } else {
                 return Lottie.asset('images/cat_loader.json', repeat: true);
               }
             }),
-        // bottomNavigationBar: Visibility(
-        //   child: buildBottomNavigationBar(),
-        //   visible: showBottomBar,
-        // ),
+        bottomNavigationBar: buildBottomNavigationBar(),
       ),
     );
   }
@@ -48,8 +57,8 @@ class HomeScreenState extends State<HomeScreen> {
     return TableCalendar(
       events: events,
       focusedDay: DateTime.now(),
-      startDay: DateTime(2020, 1, 1),
-      endDay: DateTime(2022, 1, 1),
+      startDay: DateTime.now().subtract(Duration(days: 365 * 3)),
+      endDay: DateTime.now().add(Duration(days: 365 * 3)),
       view: ViewCalendar.week,
     );
   }
