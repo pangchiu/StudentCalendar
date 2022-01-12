@@ -1,10 +1,19 @@
+import 'package:app/app_data_base.dart';
 import 'package:app/component/color.dart';
+import 'package:app/model/api_ictu.dart';
+import 'package:app/model/task.dart';
+import 'package:app/model/share_pref_memory.dart';
 import 'package:app/screen/home.dart';
+import 'package:app/screen/login.dart';
 import 'package:flutter/material.dart';
-
-const PI = 3.14;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoadScreen extends StatefulWidget {
+  final String user;
+  final String pass;
+
+  const LoadScreen({required this.user, required this.pass});
+
   @override
   LoadScreenState createState() => LoadScreenState();
 }
@@ -12,10 +21,6 @@ class LoadScreen extends StatefulWidget {
 class LoadScreenState extends State<LoadScreen> {
   @override
   void initState() {
-    Future.delayed(
-        Duration(milliseconds: 4000),
-        () => Navigator.push(
-            context, MaterialPageRoute(builder: (context) => HomeScreen())));
     super.initState();
   }
 
@@ -26,57 +31,87 @@ class LoadScreenState extends State<LoadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    Size size = MediaQuery.of(context).size;
+    getAllEvents().then((data) async {
+      // lưu thông tin đăng nhập vào sharePrerencet
+      if ((await SharePrefMemory.instance.isLogin ?? false) == false) {
+        await SharePrefMemory.instance.onLoginInfor();
+        await SharePrefMemory.instance.onUserInfor(widget.user);
+        await SharePrefMemory.instance.onPassInfor(widget.pass);
+      }
+
+      Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (context) => HomeScreen(
+                    events: data,
+                  )));
+    }).catchError((onError) async {
+      bool logined = (await SharePrefMemory.instance.isLogin) ?? false;
+      if (logined) {
+        Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (context) => HomeScreen(
+                      events: [],
+                    )));
+      } else {
+        Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (context) {
+          return LoginScreen(
+            isError: true,
+          );
+        }));
+      }
+    });
     return Scaffold(
       body: Center(
-          child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.0),
-              duration: Duration(seconds: 4),
-              builder: (context, val, child) {
-                int percent = (val * 100).ceil();
-                return Stack(
-                  children: [
-                    ShaderMask(
-                        shaderCallback: (rect) => SweepGradient(
-                              startAngle: 0.0,
-                              endAngle: PI * 2,
-                              colors: <Color>[
-                                kPrimaryColorDark,
-                                kBackgroundColorDark
-                              ],
-                              stops: [val, val],
-                              transform: GradientRotation(PI * 1.5),
-                            ).createShader(rect),
-                        child: Center(
-                          child: Container(
-                            width: size.width * 0.2,
-                            height: size.width * 0.2,
-                            decoration: BoxDecoration(
-                                shape: BoxShape.circle, color: Colors.white),
-                          ),
-                        )),
-                    Center(
-                      child: Container(
-                        alignment: Alignment.center,
-                        width: size.width * 0.2 - 20,
-                        height: size.width * 0.2 - 20,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '$percent%',
-                          style: TextStyle(
-                              color: Colors.black,
-                              fontFamily: 'Montserrat-Medium',
-                              fontSize: 20,
-                              fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              })),
+          child: SizedBox(
+        width: 60,
+        height: 60,
+        child: Stack(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              child: CircularProgressIndicator(
+                color: kPrimaryColorDark,
+                backgroundColor: kBackgroundColorDark,
+                strokeWidth: 5,
+              ),
+            ),
+          ],
+        ),
+      )),
     );
+  }
+
+  Future<void> onLoginInfor() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setBool('onLogin', true);
+  }
+
+  Future<List<Task>> getAllEvents() async {
+    // lấy data cơ sở dữ liệu
+    List<Task> tasks = await AppDatabase.instance.allTask();
+
+    // lấy api lịch học
+    var schedule = await APIICTU.instance.getSchedule(widget.user, widget.pass);
+
+    if (schedule.isNotEmpty) {
+      // xóa toàn bộ cơ sở dữ liệu
+      await AppDatabase.instance.deleteAll();
+
+      //chèn cơ sở dũ liệu mới
+      await AppDatabase.instance.insetAll(schedule);
+
+      // xóa nơi lưu tạm cơ sở dữ liệu
+      tasks.clear();
+
+      schedule.forEach((element) {
+        tasks.add(Task.fromJson(element));
+      });
+    }
+
+    return tasks;
   }
 }

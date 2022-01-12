@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:html/parser.dart' show parse;
@@ -34,18 +38,20 @@ class APIICTU {
             'Host': '220.231.119.171',
           });
 
-  Options get optionsLogin => Options(followRedirects: true, headers: {
-        'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8',
-        'Referer': urlOrigin,
-        'Accept':
-            'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67',
-        'Upgrade-Insecure-Requests': '1',
-        'Connection': 'keep-alive',
-        'Accept-Encoding': 'gzip, deflate',
-        'Host': '220.231.119.171',
-      });
+  Options get optionsLogin => Options(
+          followRedirects: true,
+          headers: {
+            'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8',
+            'Referer': urlOrigin,
+            'Accept':
+                'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67',
+            'Upgrade-Insecure-Requests': '1',
+            'Connection': 'keep-alive',
+            'Accept-Encoding': 'gzip, deflate',
+            'Host': '220.231.119.171',
+          });
 
   Options get optionsGetSchedule => Options(
           followRedirects: true,
@@ -78,14 +84,15 @@ class APIICTU {
         var response =
             await Dio().get(urlSchedule, options: optionsGetSchedule);
         if (response.statusCode == 200) {
-          urlSchedule = urlOrigin + response.realUri.toString();
+          urlSchedule = response.realUri.toString().contains(urlOrigin)
+              ? response.realUri.toString()
+              : urlOrigin + response.realUri.toString();
           var form = formDataSchedule(response);
           String defaultDrpSemester = form['defaultDrpSemester'];
           form.remove('defaultDrpSemester');
 
           var res = await Dio()
               .post(urlSchedule, options: optionsGetSchedule, data: form);
-
           var form2 = formDataSchedule(res,
               fist: false, fistDrpSemester: defaultDrpSemester);
 
@@ -96,17 +103,32 @@ class APIICTU {
           return [];
         }
       } else {
-        return [];
+        throw Exception("Login failed");
       }
     });
   }
 
   Future<Map> formData() async {
-    return await Dio().get(urlLogin, options: optionsLogin).then((response) {
+
+
+    return await Dio()
+        .get(
+          urlLogin,
+          options: optionsLogin,
+        )
+        .timeout(const Duration(milliseconds: 7000),onTimeout: (){
+          throw TimeoutException('Không có phản hồi');
+        })
+        .then((response) {
       var form = {};
-      // gán đường dẫn đăng nhập mới vì khi đăng nhập từ đường dẫn đăng nhập gốc sẽ bị điều hướng
+
       if (response.statusCode == 200) {
-        urlLogin = urlOrigin + response.realUri.toString();
+        // gán đường dẫn đăng nhập mới vì khi đăng nhập từ đường dẫn đăng nhập gốc sẽ bị điều hướng nếu thành công
+        // khi đăng nhập lần 1 chỉ có 1 phần url còn từ lần 2 trở đi sẽ có đủ toàn bộ nên khi cộng chuỗi
+        // sẽ bị trùng . => sử dụng vòng
+        urlLogin = response.realUri.toString().contains(urlOrigin)
+            ? response.realUri.toString()
+            : urlOrigin + response.realUri.toString();
 
         // trả về form để đăng nhập
 
@@ -184,9 +206,8 @@ class APIICTU {
 
   Future<String?> getCookie(String useName, String passWord, Map form) {
     form['btnSubmit'] = 'Đăng nhập';
-    form['txtUserName'] = '$useName';
-    form['txtPassword'] = '$passWord';
-
+    form['txtUserName'] = useName;
+    form['txtPassword'] = md5.convert(utf8.encode((passWord))).toString();
     return Dio()
         .post(urlLogin, options: optionsGetCokies, data: form)
         .then((response) {
@@ -198,9 +219,12 @@ class APIICTU {
     });
   }
 
-  String fomatCookies(Response<dynamic> response) {
-    var listCookies = response.headers['Set-Cookie'].toString();
-    return listCookies.split(';')[0].substring(1);
+  String? fomatCookies(Response<dynamic> response) {
+    var listCookies = response.headers['Set-Cookie'];
+    if (listCookies != null) {
+      return listCookies.toString().split(';')[0].substring(1);
+    }
+    return null;
   }
 
   List<dynamic> json(Response res) {
@@ -239,11 +263,15 @@ class APIICTU {
     if (locationDetail.length > 1) {
       List<String> keys = [];
       var address = [];
+      String kTemp = "";
       for (int index = 0; index < locationDetail.length; index++) {
-        if (locationDetail[index].indexOf("\(") != -1) {
-          keys.add(locationDetail[index].trim());
-        } else if (locationDetail[index].trim().isNotEmpty) {
-          address.add(locationDetail[index].trim());
+        if (locationDetail[index].trim().isNotEmpty) {
+          if (locationDetail[index].trim()[0] == '(') {
+            kTemp = locationDetail[index].trim();
+          } else {
+            keys.add(kTemp);
+            address.add(locationDetail[index].trim());
+          }
         }
       }
       return Map.fromIterables(keys, address);
@@ -265,7 +293,8 @@ class APIICTU {
           getCycle(docSchedule, period.start, subject, location, teacher, code);
 
       // lấy lịch môn hoc trong từng khoảng thời gian
-      var scheduleForPeriod = getScheduleDetail(cycle, period);
+      List<Map<String, dynamic>> scheduleForPeriod =
+          getScheduleDetail(cycle, period);
 
       // gộp lịch học trong các khoảng thời gian
       mergeSchedule(schedule, scheduleForPeriod);
@@ -289,8 +318,13 @@ class APIICTU {
           return false;
         });
         if (index != -1) {
-          (newRoot[index]["sessions"] as List)
-              .addAll(scheduleOfOther["sessions"]);
+          for (int i = 0;
+              i < (scheduleOfOther["sessions"] as List).length;
+              i++) {
+            (newRoot[index]["sessions"] as List)
+                .add((scheduleOfOther["sessions"][i] as Map));
+          }
+
           // sắp xếp lại thời khóa biểu
           (newRoot[index]["sessions"] as List).sort((a, b) {
             return int.parse(
@@ -319,7 +353,7 @@ class APIICTU {
           .firstWhere((element) => (element as String).indexOf(number) != -1);
       location = locations[keyOfNumber];
     } else {
-       // quy định trong phần địa điểm nếu chỉ có 1 địa điểm thì map có key "only"
+      // quy định trong phần địa điểm nếu chỉ có 1 địa điểm thì map có key "only"
       location = locations["only"];
     }
     if (cycle.length > 1) {
@@ -329,12 +363,18 @@ class APIICTU {
 
     cycle.forEach((session) {
       var lessons = session.innerHtml.split(" ");
-      if (int.parse(lessons[1]) > start.weekday) {
-        start = start
-            .add(Duration(days: int.parse(lessons[1]) - start.weekday - 1));
+      // lấy thứ :
+      late int weekday;
+      try {
+        weekday = int.parse(lessons[1]);
+      } catch (e) {
+        weekday = 8;
+      }
+      if (weekday > start.weekday) {
+        start = start.add(Duration(days: weekday - start.weekday - 1));
       } else {
-        start = start.add(Duration(
-            days: 7 - (int.parse(lessons[1]) - start.weekday - 1).abs()));
+        start =
+            start.add(Duration(days: 7 - (weekday - start.weekday - 1).abs()));
       }
       sessionsCycle.add(
         {

@@ -1,20 +1,70 @@
 import 'package:app/component/color.dart';
 import 'package:app/component/text_filed_container.dart';
+import 'package:app/model/share_pref_memory.dart';
 import 'package:app/screen/loading.dart';
 import 'package:flutter/material.dart';
 
 class LoginScreen extends StatefulWidget {
+  final bool? isError;
+
+  LoginScreen({this.isError});
+
   @override
   LoginScreenState createState() => LoginScreenState();
 }
 
 class LoginScreenState extends State<LoginScreen> {
   bool _isObscure = true;
-  TextEditingController textEditingController = TextEditingController();
+  bool _isSave = false;
+  late TextEditingController textPassController;
+  late TextEditingController textUserController;
+  @override
+  void initState() {
+    super.initState();
+
+
+    // lấy tài khoản
+    SharePrefMemory.instance.getUser().then((value) {
+      setState(() {
+        textUserController = TextEditingController(text: value);
+      });
+    });
+
+    // lấy mật khẩu
+    SharePrefMemory.instance.getPass().then((value) {
+      setState(() {
+        textPassController = TextEditingController(text: value);
+      });
+    });
+
+    textUserController = TextEditingController();
+    textPassController = TextEditingController();
+
+    SharePrefMemory.instance.isSaveInfor().then((value){
+      setState(() {
+        _isSave = value ?? false;
+      });
+    });
+
+    WidgetsBinding.instance!.addPostFrameCallback((_) {
+      if (widget.isError == true) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Đăng nhập không thành công!",
+              style: TextStyle(
+                  fontFamily: 'Montserrat-Medium',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w400)),
+          backgroundColor: kPrimaryBackgroundColor,
+          
+        ));
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     Size size = MediaQuery.of(context).size;
+
     return Scaffold(
       body: SingleChildScrollView(
         child: Padding(
@@ -43,8 +93,9 @@ class LoginScreenState extends State<LoginScreen> {
               //build user
               TextFiledContainer(
                 child: TextFormField(
-                  style: TextStyle(
-                      fontSize: 20, fontFamily: 'Montserrat-Medium'),
+                  controller: textUserController,
+                  style:
+                      TextStyle(fontSize: 15, fontFamily: 'Montserrat-Medium'),
                   decoration: InputDecoration(border: InputBorder.none),
                   cursorColor: kPrimaryColorDark,
                 ),
@@ -61,14 +112,14 @@ class LoginScreenState extends State<LoginScreen> {
               // bulid password
               TextFiledContainer(
                 child: TextFormField(
-                  style: TextStyle(
-                      fontSize: 20, fontFamily: 'Montserrat-Medium'),
+                  controller: textPassController,
+                  style:
+                      TextStyle(fontSize: 15, fontFamily: 'Montserrat-Medium'),
                   obscureText: _isObscure,
                   decoration: InputDecoration(
                     border: InputBorder.none,
                   ),
                   cursorColor: kPrimaryColorDark,
-                 
                 ),
                 label: Text(
                   'Mật khẩu',
@@ -89,7 +140,30 @@ class LoginScreenState extends State<LoginScreen> {
                   },
                 ),
               ),
-              SizedBox(height: size.height * 0.08),
+              Row(
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                        value: _isSave,
+                        activeColor: kPrimaryBackgroundColor,
+                        onChanged: (save) async {
+                          //nếu chọn lưu mật khẩu thì lưu mật khẩu và tài khoản cho lần đăng nhập sau
+                          await SharePrefMemory.instance.onSaveInfor(save!);
+                          setState(() {
+                            _isSave = save;
+                          });
+                        }),
+                  ),
+                  Text('Lưu tài khoản và mật khẩu.',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontFamily: 'Montserrat-Medium',
+                          fontWeight: FontWeight.w400)),
+                ],
+              ),
+              SizedBox(height: size.height * 0.05),
               // build login button
               Container(
                 height: size.height * 0.08,
@@ -103,18 +177,22 @@ class LoginScreenState extends State<LoginScreen> {
                     Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => LoadScreen(),
+                          builder: (context) => LoadScreen(
+                            user: textUserController.text.trim(),
+                            pass: textPassController.text.trim(),
+                          ),
                         ));
                   },
                   child: Text('ĐĂNG NHẬP',
                       style: TextStyle(
                           fontSize: 17,
                           fontFamily: 'Montserrat-Bold',
-                          fontWeight: FontWeight.w500)),
-                  textColor: kAccentColorLight,
+                          fontWeight: FontWeight.w500,
+                          color: kAccentColorLight)),
                 ),
               ),
               SizedBox(height: size.height * 0.013),
+
               Text('Made by Minh',
                   style: TextStyle(
                       fontSize: 14,

@@ -387,8 +387,9 @@ class Calendar {
     if (s.weekday != 1) {
       int nd = 7 - s.weekday + 1;
       s = DateTime(s.year, s.month, s.day + nd);
-      list.add(s);
     }
+    list.add(s);
+
     // định dạng ngày cuối cùng
     if (e.weekday != 7) {
       e = e.subtract(Duration(days: e.weekday + 1));
@@ -425,8 +426,9 @@ class Calendar {
     if (s.weekday != 1) {
       int nd = 7 - s.weekday + 1;
       s = DateTime(s.year, s.month, s.day + nd);
-      list.add(s);
+      
     }
+    list.add(s);
     // định dạng ngày cuối cùng
     if (e.weekday != 7) {
       e = e.subtract(Duration(days: e.weekday + 1));

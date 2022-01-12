@@ -11,12 +11,12 @@ class Task {
     var listSession = (json["sessions"] as List)
         .map<Session>((e) => Session.fromJson(e))
         .toList();
-    return Task(date: (json["date"] as DateTime), sessions: listSession);
+    return Task(idDay: json["idDay"],date: (json["date"] as DateTime), sessions: listSession);
   }
   Map<String, Object?> toJson() {
     return {
       "idDay" : idDay,
-      "date" : date.toIso8601String(),
+      "date" : date.toString(),
       "sessions" : sessions.map((e) => e.toJson()).toList(),
     };
   }

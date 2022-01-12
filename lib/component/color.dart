@@ -16,7 +16,7 @@ const kSecondaryColorDark = Color(0xFF00CC66);
 const kAccentColorDark = Color(0xFF000000);
 const kAccentColorLight = Color(0xFFFFFFFF);
 
-// Text ColorP
+// Text Color
 const kPrimaryBackgroundColor = Color(0xFFff5c33);
 const kTitleAccentTextColor = Color(0xFFA9A9A9);
 

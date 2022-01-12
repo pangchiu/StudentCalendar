@@ -23,13 +23,15 @@ class Session {
 
   factory Session.fromJson(Map<String, dynamic> json) {
     return Session(
+      idMissions: json["idMissions"],
+      idDay: json["idDay"],
       name: json["name"] as String,
       code: json["code"] as String,
       location: json["location"] as String,
       teacher: json["teacher"] as String,
       time: json["time"] as String,
       type: json["type"] as String,
-      // node: json["node"] as String,
+      node: (json["node"] ?? ""),
     );
   }
 

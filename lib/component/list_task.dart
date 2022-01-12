@@ -1,7 +1,10 @@
+import 'package:app/app_data_base.dart';
 import 'package:app/component/color.dart';
 import 'package:app/component/item_task.dart';
+import 'package:app/model/session.dart';
 import 'package:app/model/task.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 class ListEvent extends StatefulWidget {
@@ -18,7 +21,8 @@ class ListEvent extends StatefulWidget {
     required this.events,
     required this.startDay,
     required this.endDay,
-    required this.days,required this.focusedDay,
+    required this.days,
+    required this.focusedDay,
   });
 
   @override
@@ -152,13 +156,20 @@ class _ListEventState extends State<ListEvent> {
             padding: const EdgeInsets.only(top: 10),
             itemCount: (widget.events![indexEvent] as Task).sessions.length,
             itemBuilder: (context, i) {
+              Task task = widget.events![indexEvent];
               return Container(
                 margin: const EdgeInsets.all(5),
-                child: ItemEvent(
-                  session: (widget.events![indexEvent] as Task).sessions[i],
-                  isOldEvent: (widget.events![indexEvent] as Task)
-                      .date
-                      .isBefore(widget.focusedDay),
+                child: ItemTask(
+                  session: task.sessions[i],
+                  isOldEvent: task.date.isBefore(widget.focusedDay),
+                  onTakeNode: () async {
+                    String? node = await onTakeNode(context, task.sessions[i]);
+                    if (node != null) {
+                      setState(() {
+                        task.sessions[i].node = node;
+                      });
+                    }
+                  },
                 ),
               );
             });
@@ -191,7 +202,131 @@ class _ListEventState extends State<ListEvent> {
     }
   }
 
- 
+  Future<String?> onTakeNode(BuildContext context, Session s) async {
+    return await showDialog(
+        context: context,
+        builder: (context) {
+          final TextEditingController _textEditingController =
+              TextEditingController(text: s.node);
+          int charLenght = _textEditingController.text.length;
+          return StatefulBuilder(builder: (context, set) {
+            return Dialog(
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text("Thêm Ghi Chú",
+                          style: TextStyle(
+                              fontFamily: "Montserrat-Medium",
+                              fontSize: 15,
+                              color: kAccentColorDark)),
+                      SizedBox(
+                        height: 20,
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                            color: kBackgroundColorDark,
+                            borderRadius: BorderRadius.circular(10)),
+                        alignment: Alignment.topCenter,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                          child: TextField(
+                            controller: _textEditingController,
+                            cursorHeight: 5,
+                            maxLines: 5,
+                            inputFormatters: [
+                              LengthLimitingTextInputFormatter(50)
+                            ],
+                            cursorColor: kPrimaryColorDark,
+                            decoration: InputDecoration(
+                                border: InputBorder.none,
+                                hintText: "Nội Dung",
+                                hintStyle: TextStyle(
+                                    fontFamily: "Montserrat-Medium",
+                                    fontSize: 13,
+                                    color: kTitleAccentTextColor),
+                                counterText: '$charLenght/50',
+                                counterStyle: TextStyle(
+                                  fontFamily: "Montserrat-Medium",
+                                  fontSize: 12,
+                                )),
+                            onChanged: (value) {
+                              set(() {
+                                charLenght = value.length;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          InkWell(
+                            child: Container(
+                              height: 40,
+                              width: 60,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: kPrimaryBackgroundColor,
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: Text(
+                                'Lưu',
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontFamily: "Montserrat-Medium",
+                                    color: kAccentColorLight),
+                              ),
+                            ),
+                            onTap: () async {
+                              // lưu thông tin
+                              await AppDatabase.instance
+                                  .updateNode(s, _textEditingController.text);
+                              Navigator.pop(
+                                  context, _textEditingController.text);
+                            },
+                          ),
+                          InkWell(
+                            child: Container(
+                              height: 40,
+                              width: 60,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: Text(
+                                charLenght == 0 ? 'Hủy' : 'Xóa',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontFamily: "Montserrat-Medium",
+                                ),
+                              ),
+                            ),
+                            onTap: () {
+                              if (charLenght == 0) {
+                                Navigator.of(context).pop();
+                              } else {
+                                _textEditingController.text = "";
+                                set(() {
+                                  charLenght = 0;
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ));
+          });
+        });
+  }
+
   bool isScrollLeft(final int pos, final int index) {
     return pos < index && pos != index;
   }

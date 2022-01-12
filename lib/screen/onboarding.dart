@@ -1,9 +1,9 @@
 import 'package:app/component/color.dart';
 import 'package:app/model/content_introduce.dart';
+import 'package:app/model/share_pref_memory.dart';
 import 'package:app/screen/login.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class Onboarding extends StatefulWidget {
   @override
@@ -26,11 +26,7 @@ class _OnboardingState extends State<Onboarding> {
     super.dispose();
   }
 
-  _onBoardingInfor() async {
-    bool seen = true;
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('onBoard', seen);
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +97,7 @@ class _OnboardingState extends State<Onboarding> {
                       child: MaterialButton(
                         onPressed: () async {
                           if (index == ContentIntro.contents.length - 1) {
-                            await _onBoardingInfor();
+                            await SharePrefMemory.instance.onBoardingInfor();
                             Navigator.push(
                                 context,
                                 MaterialPageRoute(

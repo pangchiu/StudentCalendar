@@ -9,18 +9,18 @@ class ContentIntro {
     ContentIntro(
       'images/boy.svg',
       'Student Calendar',
-      'Vũ trụ đệ nhất siêu cấp ứng dụng vip pro của minh đẹp trai làm ra xứng đáng đoạt giải nobel thế giới.',
+      'Nếu bạn là sinh viên ICTU...',
     ),
     
     ContentIntro(
       'images/girl.svg',
       'Chức năng siêu cấp',
-      'Dễ dàng theo dõi lịch học cá nhân và quản lí thời gian biểu cùng vô vàn tiện ích khác'
+      'Bạn Nhiều lần đau đầu vì lịch học của trường bị lỗi:<'
     ),
     ContentIntro(
       'images/man.svg',
       'Vượt trội',
-      'Chỉ dành cho người thông minh ,đẹp trai ,khoai to và là sân chơi cho giới trẻ',
+      'SC giúp giải quyết vấn đề của bạn .fb: "Bình Minh" (Cung cấp giải pháp chống ế cho các bạn nữ)',
     ),
   ];
 }

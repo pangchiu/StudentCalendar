@@ -54,7 +54,6 @@ class TableCalendarState extends State<TableCalendar> {
   void dispose() {
     controllerMonth.dispose();
     controllerWeek.dispose();
-    controllerDay.dispose();
     super.dispose();
   }
 
@@ -186,15 +185,11 @@ class TableCalendarState extends State<TableCalendar> {
                 ),
                 SmallButton(
                   icon: SvgPicture.asset(
-                    'images/check_box.svg',
+                    'images/refresh.svg',
                     color: kAccentColorLight,
                   ),
                   color: kSecondaryColorDark,
-                  onPressed: () {
-                    if (widget.onPressUpGrade != null) {
-                      widget.onPressUpGrade!();
-                    }
-                  },
+                  onPressed: widget.onPressUpGrade ??  (){},
                 ),
               ],
             )

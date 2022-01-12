@@ -48,7 +48,7 @@ class AppDatabase {
     ''');
   }
 
-  void insetAll(List<dynamic> schedule) async {
+  Future<void> insetAll(List<dynamic> schedule) async {
     final db = await instance.database;
     await db.transaction((txn) async {
       schedule.forEach((s) async {
@@ -78,11 +78,35 @@ class AppDatabase {
         List<Session> sessions = List.generate(jsonMissions.length, (index) {
           return Session.fromJson(jsonMissions[index]);
         });
-        tasks.add(Task(
+        tasks.add(Task(idDay: int.parse(e["idDay"].toString()),
             date: DateTime.parse(e["date"].toString()), sessions: sessions));
       });
     });
-
     return tasks;
+  }
+
+  Future<void> updateNode (Session s,dynamic value) async {
+    final db =  await instance.database;
+    await db.transaction((txn) async {
+      var map = {'node' : value};
+      txn.update('MISSIONS', map, where: 'idDay = ? AND idMissions = ?',whereArgs: [s.idDay,s.idMissions]);
+    });
+  }
+
+
+  Future<void> deleteNode (Session s) async {
+    final db =  await instance.database;
+    await db.transaction((txn) async {
+      txn.delete('MISSIONS',  where: 'idDay = ? AND idMissions = ?',whereArgs: [s.idDay,s.idMissions]);
+    });
+  }
+
+
+  Future<void> deleteAll () async {
+    final db =  await instance.database;    
+    await db.transaction((txn) async {
+      txn.delete("DAYS");
+      txn.delete("MISSIONS");
+    });
   }
 }

@@ -1,70 +1,110 @@
-import 'package:app/component/color.dart';
-import 'package:app/component/table_calendar.dart';
 import 'package:app/app_data_base.dart';
-import 'package:app/model/api_ictu.dart';
+import 'package:app/component/color.dart';
 import 'package:app/model/task.dart';
+import 'package:app/tab/home_tab.dart';
+import 'package:app/tab/more_tab.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:lottie/lottie.dart';
 
 class HomeScreen extends StatefulWidget {
+  final List<Task>? events;
+
+  const HomeScreen({this.events});
+
   @override
   HomeScreenState createState() => HomeScreenState();
 }
 
 class HomeScreenState extends State<HomeScreen> {
-  int currentBottomBar = 0;
-  bool showBottomBar = false;
-  List<Task> events = [];
+  late int currentBottomBar;
+  late bool showBottomBar;
+  late Future<List<Task>> _futureTask;
 
   @override
   void initState() {
     super.initState();
+    currentBottomBar = 0;
+    showBottomBar = false;
+    _futureTask = getEventsFromDB();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: kAccentColorLight,
+    Size size = MediaQuery.of(context).size;
+    if (widget.events == null) {
+      return Scaffold(
         body: FutureBuilder<List<Task>>(
-            future: getAllEvent(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done) {
-                if (snapshot.hasError) {
-                  return Lottie.asset('images/cat_loader.json', repeat: true);
-                } else {
-                  events = snapshot.data!;
+          future: _futureTask,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.done) {
+              if (!showBottomBar) {
+                SchedulerBinding.instance!.addPostFrameCallback((_) {
                   setState(() {
                     showBottomBar = true;
                   });
-                  return Column(
-                    children: [
-                      buildCalendar(),
-                    ],
-                  );
-                }
-              } else {
-                return Lottie.asset('images/cat_loader.json', repeat: true);
+                });
               }
-            }),
-        bottomNavigationBar: buildBottomNavigationBar(),
-      ),
-    );
+              if (snapshot.hasError) {
+                return buildBody(currentBottomBar);
+              } else {
+                return buildBody(currentBottomBar, list: snapshot.data);
+              }
+            } else {
+              if (showBottomBar) {
+                SchedulerBinding.instance!.addPostFrameCallback((_) {
+                  setState(() {
+                    showBottomBar = false;
+                  });
+                });
+              }
+
+              return Center(
+                child: Container(
+                  height: size.height * 0.4,
+                  width: size.width * 0.8,
+                  child: Column(
+                    children: [
+                      Image.asset(
+                        'images/logo2.png',
+                        fit: BoxFit.fill,
+                        color: kPrimaryBackgroundColor,
+                      ),
+                      Text('Student Calendar',
+                          style: TextStyle(
+                              fontFamily: 'Montserrat-Bold', fontSize: 30))
+                    ],
+                  ),
+                ),
+              );
+            }
+          },
+        ),
+        bottomNavigationBar:
+            showBottomBar ? buildBottomNavigationBar(context) : null,
+      );
+    } else {
+      return Scaffold(
+        backgroundColor: kAccentColorLight,
+        body: buildBody(currentBottomBar, list: widget.events),
+        bottomNavigationBar: buildBottomNavigationBar(context),
+      );
+    }
   }
 
-  Widget buildCalendar() {
-    return TableCalendar(
-      events: events,
-      focusedDay: DateTime.now(),
-      startDay: DateTime.now().subtract(Duration(days: 365 * 3)),
-      endDay: DateTime.now().add(Duration(days: 365 * 3)),
-      view: ViewCalendar.week,
-    );
+  Widget buildBody(int index, {List<Task>? list}) {
+    switch (index) {
+      case 0:
+        return HomeTab(events: list ?? []);
+      default:
+        return MoreTab();
+    }
   }
 
-  Widget buildBottomNavigationBar() {
+  Widget buildBottomNavigationBar(BuildContext context) {
+    Size size = MediaQuery.of(context).size;
     return Container(
+      height: size.height * 0.075,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         boxShadow: [BoxShadow(color: kBackgroundColorDark, blurRadius: 1)],
@@ -86,56 +126,33 @@ class HomeScreenState extends State<HomeScreen> {
             currentIndex: currentBottomBar,
             items: [
               BottomNavigationBarItem(
-                  label: 'home',
-                  icon: SvgPicture.asset(
-                    'images/home.svg',
-                    width: 23,
-                    height: 23,
-                  ),
-                  activeIcon: SvgPicture.asset(
-                    'images/home.svg',
-                    color: kPrimaryBackgroundColor,
-                    width: 24.5,
-                    height: 24.5,
-                  )),
+                label: 'home',
+                icon: SvgPicture.asset(
+                  'images/home.svg',
+                  color: kTitleAccentTextColor,
+                  width: size.width * 0.04,
+                  height: size.width * 0.04,
+                ),
+                activeIcon: SvgPicture.asset(
+                  'images/home.svg',
+                  color: kPrimaryBackgroundColor,
+                  width: size.width * 0.043,
+                  height: size.width * 0.043,
+                ),
+              ),
               BottomNavigationBarItem(
-                  label: 'remind',
+                  label: 'more',
                   icon: SvgPicture.asset(
-                    'images/document_signed.svg',
-                    width: 23,
-                    height: 23,
+                    'images/align.svg',
+                    color: kTitleAccentTextColor,
+                    width: size.width * 0.04,
+                    height: size.width * 0.04,
                   ),
                   activeIcon: SvgPicture.asset(
-                    'images/document_signed.svg',
+                    'images/align.svg',
                     color: kPrimaryBackgroundColor,
-                    width: 24.5,
-                    height: 24.5,
-                  )),
-              BottomNavigationBarItem(
-                  label: 'nofi',
-                  icon: SvgPicture.asset(
-                    'images/bell.svg',
-                    width: 23,
-                    height: 23,
-                  ),
-                  activeIcon: SvgPicture.asset(
-                    'images/bell.svg',
-                    color: kPrimaryBackgroundColor,
-                    width: 24.5,
-                    height: 24.5,
-                  )),
-              BottomNavigationBarItem(
-                  label: 'apps',
-                  icon: SvgPicture.asset(
-                    'images/apps.svg',
-                    width: 23,
-                    height: 23,
-                  ),
-                  activeIcon: SvgPicture.asset(
-                    'images/apps.svg',
-                    color: kPrimaryBackgroundColor,
-                    width: 24.5,
-                    height: 24.5,
+                    width: size.width * 0.045,
+                    height: size.width * 0.045,
                   )),
             ],
           ),
@@ -144,20 +161,7 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<List<Task>> getAllEvent() async {
-    var tasks = await AppDatabase.instance.allTask();
-
-    if (tasks.isEmpty) {
-      var schedule = await APIICTU.instance
-          .getSchedule("DTC1854802010001", "c6dea4fca538c435f58b32dc7699c907");
-
-      AppDatabase.instance.insetAll(schedule);
-
-      schedule.forEach((element) {
-        tasks.add(Task.fromJson(element));
-      });
-    }
-
-    return tasks;
+  Future<List<Task>> getEventsFromDB() async {
+    return await AppDatabase.instance.allTask();
   }
 }
