@@ -1,0 +1,20 @@
+workflows:
+  my-workflow:              
+    name: work1  
+    instance_type: mac_mini   
+    max_build_duration: 120   
+    environment:
+    cache:
+    triggering:
+    scripts:
+    artifacts:
+- build/**/outputs/**/*.aab
+  - build/**/outputs/**/mapping.txt
+  - build/ios/ipa/*.ipa
+  - build/macos/**/*.pkg
+  - /tmp/xcodebuild_logs/*.log
+  - flutter_drive.log
+    publishing:
+ 	email:
+    	recipients:
+      		- DTC1854802010001@ictu.edu.vn
