@@ -1,0 +1,4 @@
+#Tue Feb 15 20:50:28 ICT 2022
+base.0=D\:\\Exe\\Flutter\\StudentCalendar\\build\\app\\intermediates\\dex\\release\\minifyReleaseWithR8\\classes.dex
+renamed.0=classes.dex
+path.0=classes.dex
