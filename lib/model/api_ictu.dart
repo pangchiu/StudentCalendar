@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:html/dom.dart';
 import 'package:html/parser.dart' show parse;
 
 class APIICTU {
@@ -38,20 +39,18 @@ class APIICTU {
             'Host': '220.231.119.171',
           });
 
-  Options get optionsLogin => Options(
-          followRedirects: true,
-          headers: {
-            'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8',
-            'Referer': urlOrigin,
-            'Accept':
-                'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67',
-            'Upgrade-Insecure-Requests': '1',
-            'Connection': 'keep-alive',
-            'Accept-Encoding': 'gzip, deflate',
-            'Host': '220.231.119.171',
-          });
+  Options get optionsLogin => Options(followRedirects: true, headers: {
+        'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8',
+        'Referer': urlOrigin,
+        'Accept':
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36 Edg/92.0.902.67',
+        'Upgrade-Insecure-Requests': '1',
+        'Connection': 'keep-alive',
+        'Accept-Encoding': 'gzip, deflate',
+        'Host': '220.231.119.171',
+      });
 
   Options get optionsGetSchedule => Options(
           followRedirects: true,
@@ -87,18 +86,9 @@ class APIICTU {
           urlSchedule = response.realUri.toString().contains(urlOrigin)
               ? response.realUri.toString()
               : urlOrigin + response.realUri.toString();
-          var form = formDataSchedule(response);
-          String defaultDrpSemester = form['defaultDrpSemester'];
-          form.remove('defaultDrpSemester');
 
-          var res = await Dio()
-              .post(urlSchedule, options: optionsGetSchedule, data: form);
-          var form2 = formDataSchedule(res,
-              fist: false, fistDrpSemester: defaultDrpSemester);
-
-          var res2 = await Dio()
-              .post(urlSchedule, options: optionsGetSchedule, data: form2);
-          return json(res2);
+          var doc = await docSchedule(response);
+          return json(doc);
         } else {
           return [];
         }
@@ -109,17 +99,14 @@ class APIICTU {
   }
 
   Future<Map> formData() async {
-
-
     return await Dio()
         .get(
-          urlLogin,
-          options: optionsLogin,
-        )
-        .timeout(const Duration(milliseconds: 7000),onTimeout: (){
-          throw TimeoutException('Không có phản hồi');
-        })
-        .then((response) {
+      urlLogin,
+      options: optionsLogin,
+    )
+        .timeout(const Duration(milliseconds: 7000), onTimeout: () {
+      throw TimeoutException('Không có phản hồi');
+    }).then((response) {
       var form = {};
 
       if (response.statusCode == 200) {
@@ -146,11 +133,66 @@ class APIICTU {
     });
   }
 
-  Map<String, dynamic> formDataSchedule(Response current,
-      {bool fist = true, String? fistDrpSemester}) {
-    Map<String, dynamic> form = {};
+  Future<Document> docSchedule(Response root) async {
+    // lịch bị đổi liên tục nên nếu chọn lịch cụ thể sẽ gây lỗi
+    // khắc phục bằng cách cho vòng for chạy lần lượt qua id các kỳ nếu thấy lịch dừng ngay
 
-    var document = parse(current.data);
+    List<String> idSemesters = [];
+    late String defaultSemester;
+    Response res = root;
+    late Document document;
+    // lấy giá trị ban đầu của danh sách kỳ học và kỳ học mặc định ban đầu
+    parse(root.data)
+        .getElementById("drpSemester")!
+        .getElementsByTagName("option")
+        .forEach((element) {
+      if (element.attributes['selected']?.compareTo('selected') == 0) {
+        defaultSemester = element.attributes['value']!;
+      }
+      idSemesters.add(element.attributes['value']!);
+    });
+    // *
+    // nếu id kỳ học trùng mặc định trùng với id đầu thì sẽ ko request đk vì nó không
+    // khác gì request mặc định nên nó sẽ ko request gì
+    // xử lý : request từ id kỳ học thứ 2 rồi request lại kỳ học đầu để xem có lịch không
+
+    int index = 0;
+    if (defaultSemester.compareTo(idSemesters[0]) == 0) {
+      index = 1;
+    }
+    for (int i = index; i < idSemesters.length; i++) {
+      var data = formDataDynamic(res, idSemesters[i]);
+      res = await Dio()
+          .post(urlSchedule, options: optionsGetSchedule, data: data);
+
+      document = parse(res.data);
+
+      if (document.getElementsByClassName("cssListItem").isNotEmpty ||
+          document
+              .getElementsByClassName('cssListAlternativeItem')
+              .isNotEmpty) {
+        break;
+      }
+    }
+    // request lại với kỳ học đầu nếu xảy ra *
+    if (index == 1) {
+      var resTemp = await Dio().post(urlSchedule,
+          options: optionsGetSchedule,
+          data: formDataDynamic(res, defaultSemester));
+      var docTemp = parse(resTemp.data);
+
+      if (docTemp.getElementsByClassName("cssListItem").isNotEmpty ||
+          docTemp.getElementsByClassName('cssListAlternativeItem').isNotEmpty) {
+        document = docTemp;
+      }
+    }
+
+    return document;
+  }
+
+  Map<String, dynamic> formDataDynamic(Response response, String semester) {
+    Map<String, dynamic> form = {};
+    var document = parse(response.data);
 
     form['__VIEWSTATE'] =
         document.getElementById('__VIEWSTATE')!.attributes['value'].toString();
@@ -160,25 +202,9 @@ class APIICTU {
         .attributes['value']
         .toString();
 
-    /*  khi request lần đầu sẽ có khả năng không có lịch nên sẽ phải
-     request lần 2 để có dữ liệu khi request lần 1 sẽ mất đi drpSemester mặc định
-     ban đầu nên cần tạo thêm biến để lưu drpSemester mặc định */
+    // drpSemester
+    form['drpSemester'] = semester;
 
-    if (fist == true) {
-      // drpSemester
-      form['drpSemester'] = document
-          .getElementById('drpSemester')!
-          .querySelectorAll('option')[0]
-          .attributes['value'];
-
-      var opts =
-          document.getElementById('drpSemester')!.querySelectorAll('option');
-      int index =
-          opts.indexWhere((e) => e.attributes['selected'] == 'selected');
-      form['defaultDrpSemester'] = opts[index].attributes['value'];
-    } else {
-      form['drpSemester'] = fistDrpSemester!;
-    }
     //hidShowTeacher
     form['hidShowTeacher'] =
         document.getElementById('hidShowTeacher')!.attributes['value'];
@@ -227,19 +253,19 @@ class APIICTU {
     return null;
   }
 
-  List<dynamic> json(Response res) {
-    var schedule = mergeSchedule(getScheduleByClass(res, "cssListItem"),
-        getScheduleByClass(res, "cssListAlternativeItem"));
+  List<dynamic> json(Document doc) {
+    var schedule = mergeSchedule(getScheduleByClass(doc, "cssListItem"),
+        getScheduleByClass(doc, "cssListAlternativeItem"));
     return schedule;
   }
 
   List<Map<String, dynamic>> getScheduleByClass(
-      Response<dynamic> res, String className) {
+      Document doc, String className) {
     List<Map<String, dynamic>> schedule = [];
-    var docs = parse(res.data).getElementsByClassName(className);
+    var elements = doc.getElementsByClassName(className);
 
-    docs.forEach((doc) {
-      var datas = doc.getElementsByTagName("td");
+    elements.forEach((e) {
+      var datas = e.getElementsByTagName("td");
 
       // phần tử thứ 0 là stt
       // phần tử thứ 1 là tên và mã môn
